@@ -291,30 +291,33 @@ class BannerResult:
 class BannerQuery:
     subject: str = ''
     courseNumber: int = 0
-    sequenceNumber: str = None
+    sequenceNumber: str = ''
     pageMaxSize: int = 100
     term: int = 0
 
-    __params = {
-        "subject": "txt_subject",
-        "courseNumber": "txt_courseNumber",
-        "term": "txt_term",
-        "pageMaxSize": "pageMaxSize",
-    }
-
     def getParams(self):
-        params = {}
+        params = {
+            "txt_term": self.term,
+            "pageMaxSize": self.pageMaxSize
+        }
 
-        for key, value in BannerQuery.__params.items():
-            attr = getattr(self, key)
-
-            if attr != getattr(BannerQuery, key): # If attribute is not equal to the default value, add it to the params dict
-                params[value] = getattr(self, key)
+        if self.courseNumber:
+            params['txt_courseNumber'] = self.courseNumber
+            
+        if self.subject:
+            params['txt_subject'] = self.subject
+        
+        if self.pageMaxSize != BannerQuery.pageMaxSize:
+            params['pageMaxSize'] = self.pageMaxSize
+        
+        return params
 
 """ ------------------------------- Banner functions ------------------------------- """
 
 j = re.compile('JSESSIONID=[0-9A-F]*;')
 n = re.compile('nubanner-cookie=[0-9\.]*;')
+
+MIN_TERM = 201010 # Fall of 2009
 
 def validateSession(term):
     headers = { 'Content-Type': 'application/x-www-form-urlencoded; charset=UT' }
@@ -326,12 +329,17 @@ def validateSession(term):
 
     return j.search(set_cookie).group() + n.search(set_cookie).group()
 
-def searchCourses(query: BannerQuery, term, cookie) -> BannerResult:
+def searchCourses(query: BannerQuery) -> BannerResult:
+    if query.term < MIN_TERM:
+        raise Exception(f'Minimum term is Fall of 2009 ({MIN_TERM})')
+
+    cookie = validateSession(query.term)
+
     headers = { 'Cookie': cookie }
+    # Reset the form before sending query
     reset = requests.post('https://nubanner.neu.edu/StudentRegistrationSsb/ssb/classSearch/resetDataForm', headers=headers)
 
+    # Send query request and get result
     res = requests.get('https://nubanner.neu.edu/StudentRegistrationSsb/ssb/searchResults/searchResults', headers=headers, params=query.getParams())
 
-    json = res.json()
-
-    return BannerResult.fromJSON(json)
+    return BannerResult.fromJSON(res.json())
