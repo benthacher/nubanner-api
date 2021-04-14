@@ -4,6 +4,7 @@ import time
 
 from dataclasses import dataclass
 from typing import List
+from enum import IntEnum
 
 """ ------------------------------- Banner Data classes ------------------------------- """
 
@@ -287,17 +288,55 @@ class BannerResult:
         
         return res
 
+class TermDesc(IntEnum):
+    FALL_SEMESTER = 110
+    FALL_LAW_SEMESTER = 112
+    FALL_CPS_SEMESTER = 114
+    FALL_CPS_QUARTER = 115
+    FALL_LAW_QUARTER = 118
+    WINTER_CPS_QUARTER = 25
+    WINTER_LAW_QUARTER = 28
+    SPRING_SEMESTER = 30
+    SPRING_LAW_SEMESTER = 32
+    SPRING_CPS_SEMESTER = 34
+    SPRING_CPS_QUARTER = 35
+    SPRING_LAW_QUARTER = 38
+    SUMMER_1_SEMESTER = 40
+    SUMMER_FULL_SEMESTER = 50
+    SUMMER_SEMESTER_LAW = 52
+    SUMMER_CPS_SEMESTER = 54
+    SUMMER_CPS_QUARTER = 55
+    SUMMER_LAW_QUARTER = 58
+    SUMMER_2_SEMESTER = 60
+
+@dataclass
+class Term:
+    year: int
+    termDesc: TermDesc
+
+    def getCode(self):
+        return self.year * 100 + self.termDesc
+    
+    def __lt__(self, other):
+        return self.getCode() < other.getCode()
+
+    @staticmethod
+    def fromCode(code):
+        for desc in TermDesc:
+            if (code - desc) % 100 == 0:
+                return Term((code - desc) // 100, desc)
+
 @dataclass
 class BannerQuery:
+    term: Term
     subject: str = ''
     courseNumber: int = 0
     sequenceNumber: str = ''
     pageMaxSize: int = 100
-    term: int = 0
 
     def getParams(self):
         params = {
-            "txt_term": self.term,
+            "txt_term": self.term.getCode(),
             "pageMaxSize": self.pageMaxSize
         }
 
@@ -317,11 +356,11 @@ class BannerQuery:
 j = re.compile('JSESSIONID=[0-9A-F]*;')
 n = re.compile('nubanner-cookie=[0-9\.]*;')
 
-MIN_TERM = 201010 # Fall of 2009
+MIN_TERM = Term(2009, TermDesc.FALL_SEMESTER) # Fall of 2009
 
 def validateSession(term):
     headers = { 'Content-Type': 'application/x-www-form-urlencoded; charset=UT' }
-    data = f'term={term}&studyPath=&studyPathText=&startDatepicker=&endDatepicker='
+    data = f'term={term.getCode()}&studyPath=&studyPathText=&startDatepicker=&endDatepicker='
 
     res = requests.post('https://nubanner.neu.edu/StudentRegistrationSsb/ssb/term/search?mode=plan', headers=headers, data=data)
 
